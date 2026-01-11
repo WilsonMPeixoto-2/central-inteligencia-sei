@@ -33,3 +33,9 @@
 ## Testes
 - [x] Criar testes para procedures do chat
 - [x] Testar fluxo completo de RAG
+
+## Atualização do Prompt Mestre
+- [x] Implementar novo system prompt com hierarquia de resposta (Nível 1, 2, 3)
+- [x] Adicionar regras de formatação e estilo (passo a passo, destaques, citações)
+- [x] Implementar guardrails de segurança (proteção de dados, escopo negativo)
+- [x] Atualizar identidade do assistente para 4ª CRE

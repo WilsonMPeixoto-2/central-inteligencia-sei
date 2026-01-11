@@ -89,8 +89,10 @@ describe("RAG Service", () => {
   describe("SYSTEM_PROMPT", () => {
     it("should contain key instructions", () => {
       expect(SYSTEM_PROMPT).toContain("SEI");
-      expect(SYSTEM_PROMPT).toContain("Fontes consultadas");
-      expect(SYSTEM_PROMPT).toContain("português do Brasil");
+      expect(SYSTEM_PROMPT).toContain("Fonte");
+      expect(SYSTEM_PROMPT).toContain("4ª CRE");
+      expect(SYSTEM_PROMPT).toContain("HIERARQUIA DE RESPOSTA");
+      expect(SYSTEM_PROMPT).toContain("GUARDRAILS");
     });
 
     it("should be a non-empty string", () => {
