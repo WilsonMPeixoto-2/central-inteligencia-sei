@@ -296,11 +296,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.temperature = 0.5  // Equilíbrio entre precisão técnica e fluidez
+  payload.max_tokens = 32768;
+  payload.temperature = 0.5;  // Equilíbrio entre precisão técnica e fluidez
   payload.thinking = {
     "budget_tokens": 128
-  }
+  };
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
