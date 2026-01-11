@@ -57,7 +57,7 @@ export const appRouter = router({
         });
         
         // Get AI response with RAG
-        const { response, sources } = await chatWithRAG(input.message, conversationHistory);
+        const { response, sources, usedWebSearch } = await chatWithRAG(input.message, conversationHistory);
         
         // Save assistant response
         await addChatMessage({
@@ -70,7 +70,8 @@ export const appRouter = router({
         return {
           sessionId,
           response,
-          sources
+          sources,
+          usedWebSearch
         };
       }),
 

@@ -1,6 +1,7 @@
 import { invokeLLM } from "./_core/llm";
 import * as fs from "fs";
 import * as path from "path";
+import { searchGovernmentSites, formatWebSearchContext, formatWebSources, WebSearchResult } from "./webSearch";
 
 // Knowledge base content loaded from text files
 let knowledgeBase: { content: string; source: string; section?: string }[] = [];
@@ -419,23 +420,56 @@ export function formatSources(chunks: ReturnType<typeof searchKnowledgeBase>): {
 export async function chatWithRAG(
   userMessage: string,
   conversationHistory: { role: "user" | "assistant"; content: string }[] = []
-): Promise<{ response: string; sources: { documentTitle: string; section?: string }[] }> {
+): Promise<{ response: string; sources: { documentTitle: string; section?: string; link?: string }[]; usedWebSearch: boolean }> {
   
   // Busca em dois passes
   const { chunks: relevantChunks, passUsed } = searchWithTwoPasses(userMessage, 12);
-  const context = formatContext(relevantChunks);
-  const sources = formatSources(relevantChunks);
+  let context = formatContext(relevantChunks);
+  let sources: { documentTitle: string; section?: string; link?: string }[] = formatSources(relevantChunks);
+  let usedWebSearch = false;
+  let webSearchResults: WebSearchResult[] = [];
   
   // Classificar intenção para contexto adicional
   const intent = classifyIntent(userMessage);
   const intentContext = intent ? `\n\n[Intenção detectada: ${intent}]` : "";
+  
+  // ============================================================================
+  // FALLBACK WEB: Se não encontrou resultados suficientes na base local
+  // ============================================================================
+  const needsWebSearch = relevantChunks.length < 3 || 
+    (relevantChunks.length > 0 && (relevantChunks[0] as any).score < 8);
+  
+  if (needsWebSearch) {
+    console.log("[RAG] Insufficient local results, trying web search fallback...");
+    
+    try {
+      const webResponse = await searchGovernmentSites(userMessage, 5);
+      
+      if (webResponse.success && webResponse.results.length > 0) {
+        usedWebSearch = true;
+        webSearchResults = webResponse.results;
+        
+        // Adicionar contexto da busca web
+        const webContext = formatWebSearchContext(webSearchResults);
+        context += webContext;
+        
+        // Adicionar fontes web
+        const webSources = formatWebSources(webSearchResults);
+        sources = [...sources, ...webSources];
+        
+        console.log(`[RAG] Web search added ${webSearchResults.length} results`);
+      }
+    } catch (error) {
+      console.error("[RAG] Web search fallback error:", error);
+    }
+  }
   
   // Build messages for LLM
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { 
       role: "system", 
-      content: `Contexto relevante da base de conhecimento (${relevantChunks.length} trechos encontrados, passe ${passUsed}):${intentContext}\n\n${context}` 
+      content: `Contexto relevante da base de conhecimento (${relevantChunks.length} trechos encontrados, passe ${passUsed}${usedWebSearch ? " + busca web" : ""}):${intentContext}\n\n${context}` 
     }
   ];
   
@@ -445,10 +479,16 @@ export async function chatWithRAG(
     messages.push({ role: msg.role, content: msg.content });
   }
   
-  // Add current user message with instruction
-  const enhancedUserMessage = relevantChunks.length === 0 
-    ? `${userMessage}\n\n[INSTRUÇÃO: Não foram encontrados trechos relevantes na base de conhecimento. Tente responder com base no seu conhecimento geral sobre o SEI, mas avise que a informação não foi encontrada nos manuais.]`
-    : userMessage;
+  // Add current user message with instruction based on search results
+  let enhancedUserMessage = userMessage;
+  
+  if (relevantChunks.length === 0 && !usedWebSearch) {
+    enhancedUserMessage = `${userMessage}\n\n[INSTRUÇÃO: Não foram encontrados trechos relevantes na base de conhecimento nem na busca web. Responda: "Não encontrei base documental segura para orientar sobre este caso específico." e sugira que o usuário reformule a pergunta ou consulte a equipe técnica.]`;
+  } else if (relevantChunks.length === 0 && usedWebSearch) {
+    enhancedUserMessage = `${userMessage}\n\n[INSTRUÇÃO: A informação não foi encontrada nos manuais internos, mas foram encontrados resultados em fontes governamentais externas. OBRIGATORIAMENTE inicie sua resposta com: "Esta informação não consta no manual interno, mas localizei na legislação externa:" e cite as fontes web ao final.]`;
+  } else if (usedWebSearch) {
+    enhancedUserMessage = `${userMessage}\n\n[INSTRUÇÃO: Além dos manuais internos, foram consultadas fontes governamentais externas para complementar a resposta. Se usar informações da web, indique claramente que são de fontes externas.]`;
+  }
   
   messages.push({ role: "user", content: enhancedUserMessage });
   
@@ -462,7 +502,7 @@ export async function chatWithRAG(
         ? responseContent.map(c => c.type === "text" ? c.text : "").join("") 
         : "Desculpe, não consegui processar sua pergunta.";
     
-    return { response, sources };
+    return { response, sources, usedWebSearch };
   } catch (error) {
     console.error("[RAG] Error calling LLM:", error);
     throw error;

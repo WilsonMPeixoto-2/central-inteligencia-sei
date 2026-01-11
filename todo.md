@@ -53,3 +53,10 @@
 - [x] Adicionar protocolo cognitivo (análise de intenção, tradução técnica)
 - [x] Implementar formatação visual obrigatória (listas, negrito, itálico)
 - [x] Adicionar dicas de ouro e antecipação de dúvidas
+
+## Fallback de Busca Web
+- [x] Criar serviço de busca web com Google Search API
+- [x] Restringir busca a domínios governamentais (.gov.br, rio.rj.gov.br, planalto.gov.br)
+- [x] Integrar fallback no fluxo RAG após dois passes sem resultado
+- [x] Adicionar aviso obrigatório quando resposta vier da web
+- [x] Testar fallback com perguntas fora do escopo dos manuais

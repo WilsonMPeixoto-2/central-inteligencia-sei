@@ -21,7 +21,8 @@ interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
-  sources?: { documentTitle: string; section?: string }[];
+  sources?: { documentTitle: string; section?: string; link?: string }[];
+  usedWebSearch?: boolean;
 }
 
 const EXAMPLE_QUESTIONS = [
@@ -49,6 +50,7 @@ export default function Home() {
           role: "assistant",
           content: data.response,
           sources: data.sources,
+          usedWebSearch: data.usedWebSearch,
         },
       ]);
       setIsLoading(false);
@@ -204,25 +206,51 @@ export default function Home() {
                           )}
                           
                           {/* Sources */}
-                          {message.sources && message.sources.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border/50">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">
-                                Fontes consultadas:
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                {message.sources.map((source, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded"
-                                  >
-                                    <FileText className="w-3 h-3" />
-                                    {source.documentTitle}
-                                    {source.section && ` - ${source.section}`}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                                          {/* Web Search Indicator */}
+                                          {message.usedWebSearch && (
+                                            <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                              </svg>
+                                              Inclui informações de fontes governamentais externas
+                                            </div>
+                                          )}
+                                          
+                                          {/* Sources */}
+                                          {message.sources && message.sources.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-border/50">
+                                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                                Fontes consultadas:
+                                              </p>
+                                              <div className="flex flex-wrap gap-1">
+                                                {message.sources.map((source, idx) => (
+                                                  source.link ? (
+                                                    <a
+                                                      key={idx}
+                                                      href={source.link}
+                                                      target="_blank"
+                                                      rel="noopener noreferrer"
+                                                      className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                                                    >
+                                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                      </svg>
+                                                      {source.documentTitle}
+                                                    </a>
+                                                  ) : (
+                                                    <span
+                                                      key={idx}
+                                                      className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded"
+                                                    >
+                                                      <FileText className="w-3 h-3" />
+                                                      {source.documentTitle}
+                                                      {source.section && ` - ${source.section}`}
+                                                    </span>
+                                                  )
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
                         </div>
                       </div>
                     ))}
