@@ -80,3 +80,10 @@
 - [x] Implementar linguagem acolhedora (Entendo sua dúvida, Fique tranquilo)
 - [x] Adicionar analogias didáticas antes de comandos técnicos
 - [x] Explicar o PORQUÊ de cada ação, não apenas onde clicar
+
+
+## Upgrade para Gemini 3
+- [x] Atualizar modelo para gemini-3-pro-preview
+- [x] Configurar thinking_level para 'high'
+- [x] Implementar fallback para gemini-1.5-pro-latest em caso de erro
+- [x] Testar funcionamento do novo modelo

@@ -279,54 +279,103 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     response_format,
   } = params;
 
-  const payload: Record<string, unknown> = {
-    model: "gemini-1.5-pro-latest",  // Modelo mais capaz para qualidade de raciocínio
-    messages: messages.map(normalizeMessage),
+  // Modelo primário: Gemini 3 Pro Preview com raciocínio avançado
+  const PRIMARY_MODEL = "gemini-3-pro-preview";
+  // Modelo de fallback: Gemini 1.5 Pro Latest (caso erro de cota/disponibilidade)
+  const FALLBACK_MODEL = "gemini-1.5-pro-latest";
+
+  const buildPayload = (modelName: string): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      model: modelName,
+      messages: messages.map(normalizeMessage),
+    };
+
+    if (tools && tools.length > 0) {
+      payload.tools = tools;
+    }
+
+    const normalizedToolChoice = normalizeToolChoice(
+      toolChoice || tool_choice,
+      tools
+    );
+    if (normalizedToolChoice) {
+      payload.tool_choice = normalizedToolChoice;
+    }
+
+    payload.max_tokens = 32768;
+    payload.temperature = 0.5;  // Equilíbrio entre precisão técnica e fluidez
+    
+    // Configuração de thinking para Gemini 3
+    if (modelName === PRIMARY_MODEL) {
+      payload.thinking = {
+        "type": "enabled",
+        "budget_tokens": 8192  // Budget maior para raciocínio avançado
+      };
+      payload.thinking_level = "high";  // Ativa raciocínio avançado para interpretar manuais
+    } else {
+      payload.thinking = {
+        "budget_tokens": 128
+      };
+    }
+
+    const normalizedResponseFormat = normalizeResponseFormat({
+      responseFormat,
+      response_format,
+      outputSchema,
+      output_schema,
+    });
+
+    if (normalizedResponseFormat) {
+      payload.response_format = normalizedResponseFormat;
+    }
+
+    return payload;
   };
 
-  if (tools && tools.length > 0) {
-    payload.tools = tools;
-  }
-
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
-  }
-
-  payload.max_tokens = 32768;
-  payload.temperature = 0.5;  // Equilíbrio entre precisão técnica e fluidez
-  payload.thinking = {
-    "budget_tokens": 128
-  };
-
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
-
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
-  }
-
-  const response = await fetch(resolveApiUrl(), {
+  // Tenta primeiro com o modelo primário (Gemini 3)
+  let response = await fetch(resolveApiUrl(), {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${ENV.forgeApiKey}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(buildPayload(PRIMARY_MODEL)),
   });
 
+  // Se falhar com erro de cota/disponibilidade, tenta o fallback
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    const isQuotaOrAvailabilityError = 
+      response.status === 429 || // Rate limit / quota exceeded
+      response.status === 503 || // Service unavailable
+      response.status === 500 || // Internal server error
+      errorText.toLowerCase().includes("quota") ||
+      errorText.toLowerCase().includes("unavailable") ||
+      errorText.toLowerCase().includes("capacity");
+
+    if (isQuotaOrAvailabilityError) {
+      console.log(`[LLM] Gemini 3 indisponível (${response.status}), usando fallback gemini-1.5-pro-latest`);
+      
+      response = await fetch(resolveApiUrl(), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${ENV.forgeApiKey}`,
+        },
+        body: JSON.stringify(buildPayload(FALLBACK_MODEL)),
+      });
+
+      if (!response.ok) {
+        const fallbackErrorText = await response.text();
+        throw new Error(
+          `LLM invoke failed (fallback): ${response.status} ${response.statusText} – ${fallbackErrorText}`
+        );
+      }
+    } else {
+      throw new Error(
+        `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+      );
+    }
   }
 
   return (await response.json()) as InvokeResult;
