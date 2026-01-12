@@ -14,8 +14,10 @@ import {
   BookOpen,
   FileSearch,
   ClipboardList,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from "lucide-react";
+import { Link } from "wouter";
 
 interface ChatMessage {
   id: number;
@@ -426,6 +428,14 @@ export default function Home() {
           <p className="text-center text-[10px] text-muted-foreground/60 mt-1">
             Uso interno orientativo — sujeito a validação por fontes oficiais
           </p>
+          <div className="text-center mt-2">
+            <Link href="/relatorio-tecnico">
+              <span className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline cursor-pointer">
+                <Settings className="w-3 h-3" />
+                Relatório Técnico do Projeto
+              </span>
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

@@ -126,3 +126,14 @@
 - [x] Aumentar line-height dos parágrafos do painel direito
 - [x] Reduzir tamanho do texto de rodapé
 - [x] Garantir consistência de títulos (mesmo peso e tamanho)
+
+
+## Página de Relatório Técnico
+- [x] Criar página dedicada /relatorio-tecnico com design profissional
+- [x] Implementar navegação entre Home e Relatório Técnico
+- [x] Aplicar design institucional consistente com o restante do site
+- [x] Incluir todas as 7 seções do relatório com formatação visual
+- [x] Adicionar diagrama de arquitetura visual
+- [x] Implementar tabelas estilizadas para stack e configurações
+- [x] Adicionar botão de impressão/download
+- [x] Testar responsividade e salvar checkpoint
