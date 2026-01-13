@@ -1,10 +1,19 @@
 import { invokeLLM } from "./_core/llm";
 import * as fs from "fs";
 import * as path from "path";
+import mammoth from "mammoth";
 import { searchGovernmentSites, formatWebSearchContext, formatWebSources, WebSearchResult } from "./webSearch";
 
 // Knowledge base content loaded from text files
-let knowledgeBase: { content: string; source: string; section?: string }[] = [];
+interface KnowledgeChunk {
+  content: string;
+  source: string;
+  section?: string;
+  sourceType?: string;
+  updatedAt?: string;
+}
+
+let knowledgeBase: KnowledgeChunk[] = [];
 
 // ============================================================================
 // SYSTEM PROMPT - "O Mentor do SEI"
@@ -97,18 +106,41 @@ Não recuse. Responda com um "mapa de navegação":
 - Links oficiais (se disponíveis)
 - 3 perguntas para refinar
 
-## 6. HIERARQUIA DE RESPOSTA
+## 6. REGRA DE OURO: NÃO INVENTAR
+
+**NUNCA invente informações.** Se não houver base documental (manual ou fonte oficial), diga claramente:
+> "Não localizei essa informação nos manuais disponíveis nem em fontes oficiais. Recomendo consultar [setor/fonte apropriada]."
+
+**Indicar lacunas explicitamente:**
+- Se a base responde parcialmente, indique o que foi encontrado E o que não foi.
+- Exemplo: "Encontrei o procedimento geral de cancelamento (Manual SEI, p. X), mas não localizei orientação específica sobre [caso particular]. Sugiro consultar a CGM-RIO."
+
+## 7. REGRA ANTI-CONFUSÃO: SEI FEDERAL vs SEI-RIO vs PROCESSO.RIO
+
+**ATENÇÃO:** Existem sistemas distintos que podem ser confundidos:
+- **SEI Federal**: Sistema Eletrônico de Informações do Governo Federal (sei.gov.br)
+- **SEI!RIO (SEI-Rio)**: Instância do SEI utilizada pelo Município do Rio de Janeiro
+- **Processo.Rio**: Sistema de processos administrativos do Município do Rio (DIFERENTE do SEI!RIO)
+
+**Ao responder:**
+- Se a pergunta mencionar "SEI-Rio" ou "SEI!RIO", priorize informações específicas da instância municipal.
+- Se a pergunta for comparativa ("diferença entre X e Y"), OBRIGATORIAMENTE busque na web para não inventar.
+- Se não souber a diferença, diga: "Não tenho informação segura sobre as diferenças entre esses sistemas. Recomendo consultar a CGM-RIO ou o portal oficial."
+
+## 8. HIERARQUIA DE RESPOSTA
 
 ### NÍVEL 1 (Prioridade Máxima): Base de Conhecimento Local
 - Busque a resposta PRIMEIRO nos manuais carregados.
 - Se encontrar, responda de forma completa e cite a fonte no final.
 
 ### NÍVEL 2 (Fallback): Busca Web Governamental
-Dispare busca web quando ocorrer pelo menos 1 condição:
-- Confiança baixa no RAG (poucos resultados ou divergentes)
-- O usuário pede explicitamente: "o que diz a CGM-RIO...", "qual decreto...", "qual norma..."
-- A resposta exige base normativa (prazos, competência, rito formal)
-- A base interna aborda o "como fazer", mas o usuário pede "onde está previsto" (legislação/ato)
+**GATILHOS OBRIGATÓRIOS para busca web:**
+1. Confiança baixa no RAG (poucos resultados ou score baixo)
+2. O usuário pede explicitamente: "o que diz a CGM-RIO...", "qual decreto...", "qual norma..."
+3. A resposta exige base normativa (prazos, competência, rito formal)
+4. A base interna aborda o "como fazer", mas o usuário pede "onde está previsto" (legislação/ato)
+5. **PERGUNTAS COMPARATIVAS**: "diferença entre...", "qual a relação entre...", "X vs Y"
+6. **TERMOS FORA DA BASE**: se o termo principal não aparece nos chunks recuperados
 
 **Ranking de prioridade de fontes:**
 1. **Autoridade máxima**: rio.rj.gov.br, doweb.rio.rj.gov.br (D.O.M.), páginas oficiais SME/CGM, gov.br, planalto.gov.br, senado.leg.br, camara.leg.br, alerj.rj.gov.br
@@ -122,21 +154,27 @@ Dispare busca web quando ocorrer pelo menos 1 condição:
 - Cite o link e, quando for norma, cite artigo/trecho
 - Não "invente" clique/fluxo no SEI se não houver manual/guia confiável
 
-### NÍVEL 3 (Falha): Apenas após esgotar opções
+### NÍVEL 3 (Resposta com Lacunas): Quando não encontrar tudo
+- Se encontrou PARTE da resposta, entregue o que tem e indique a lacuna:
+> "Encontrei [X] nos manuais. Porém, não localizei informação sobre [Y]. Para essa parte, recomendo consultar [fonte/setor]."
+
+### NÍVEL 4 (Falha Total): Apenas após esgotar opções
 - Só responda "Não encontrei base documental segura para orientar sobre este caso específico." após:
   1. Busca com pergunta original
   2. Busca com pergunta expandida (sinônimos)
   3. Tentativa de busca web
 
-## 7. GUARDRAILS (Segurança)
+## 9. GUARDRAILS (Segurança)
 - **Proteção de Dados**: Se houver dados pessoais, ignore-os e alerte: "⚠️ Por favor, não insira dados pessoais ou sigilosos neste chat."
 - **Neutralidade**: Nunca emita opiniões jurídicas. Você fornece informações operacionais.
+- **Honestidade**: Se não sabe, diga que não sabe. Não invente.
 
-## 8. BASE DE CONHECIMENTO
+## 10. BASE DE CONHECIMENTO
 - Manual do Usuário SEI 4.0
 - Cartilha do Usuário SEI
 - Manual de Prestação de Contas SDP
-- Guia Orientador SDP - 4ª CRE (Circular E/SUBG/CPGOF Nº 06/2024)`;
+- Guia Orientador SDP - 4ª CRE (Circular E/SUBG/CPGOF Nº 06/2024)
+- Guia de Erros no SEI-RJ: Cancelamento e Correção`;
 
 // ============================================================================
 // SINÔNIMOS E EXPANSÃO DE CONSULTAS
@@ -278,11 +316,13 @@ export function loadKnowledgeBase() {
     return;
   }
   
-  const files = fs.readdirSync(knowledgeDir).filter(f => f.endsWith(".txt"));
+  const txtFiles = fs.readdirSync(knowledgeDir).filter(f => f.endsWith(".txt"));
+  const docxFiles = fs.readdirSync(knowledgeDir).filter(f => f.endsWith(".docx"));
   
   knowledgeBase = [];
   
-  for (const file of files) {
+  // Carregar arquivos TXT
+  for (const file of txtFiles) {
     const filePath = path.join(knowledgeDir, file);
     const content = fs.readFileSync(filePath, "utf-8");
     
@@ -295,12 +335,67 @@ export function loadKnowledgeBase() {
       knowledgeBase.push({
         content: chunk,
         source: sourceName,
-        section: `Parte ${index + 1}`
+        section: `Parte ${index + 1}`,
+        sourceType: "pdf",
+        updatedAt: "2024-12-01"
       });
     });
   }
   
-  console.log(`[RAG] Loaded ${knowledgeBase.length} chunks from ${files.length} files`);
+  console.log(`[RAG] Loaded ${knowledgeBase.length} chunks from ${txtFiles.length} TXT files`);
+  
+  // Carregar arquivos DOCX de forma assíncrona
+  loadDocxFiles(knowledgeDir, docxFiles);
+}
+
+// Carregar arquivos DOCX de forma assíncrona
+async function loadDocxFiles(knowledgeDir: string, docxFiles: string[]) {
+  for (const file of docxFiles) {
+    try {
+      const filePath = path.join(knowledgeDir, file);
+      const buffer = fs.readFileSync(filePath);
+      
+      // Extrair texto do DOCX preservando estrutura
+      const result = await mammoth.extractRawText({ buffer });
+      const content = normalizeDocxText(result.value);
+      
+      // Chunks maiores para DOCX (4000-6000 caracteres)
+      const chunks = splitIntoChunks(content, 5000, 600);
+      
+      const sourceName = getSourceName(file);
+      const stats = fs.statSync(filePath);
+      const updatedAt = stats.mtime.toISOString().split('T')[0];
+      
+      chunks.forEach((chunk, index) => {
+        knowledgeBase.push({
+          content: chunk,
+          source: sourceName,
+          section: `Seção ${index + 1}`,
+          sourceType: "docx",
+          updatedAt: updatedAt
+        });
+      });
+      
+      console.log(`[RAG] Loaded ${chunks.length} chunks from DOCX: ${file}`);
+    } catch (error) {
+      console.error(`[RAG] Error loading DOCX ${file}:`, error);
+    }
+  }
+  
+  console.log(`[RAG] Total knowledge base: ${knowledgeBase.length} chunks`);
+}
+
+// Normalizar texto extraído de DOCX
+function normalizeDocxText(text: string): string {
+  return text
+    // Remover quebras de linha duplicadas
+    .replace(/\n{3,}/g, '\n\n')
+    // Preservar títulos e numerações
+    .replace(/^(\d+\.\s+)/gm, '\n$1')
+    // Remover espaços extras
+    .replace(/[ \t]+/g, ' ')
+    // Limpar início e fim
+    .trim();
 }
 
 function getSourceName(filename: string): string {
@@ -308,10 +403,11 @@ function getSourceName(filename: string): string {
     "cartilha_sei_content.txt": "Cartilha do Usuário SEI",
     "manual_sei_4_content.txt": "Manual do Usuário SEI 4.0",
     "manual_usuario_sei_content.txt": "Manual do Usuário SEI",
-    "pdf_content.txt": "Manual de Prestação de Contas SDP - 4ª CRE"
+    "pdf_content.txt": "Manual de Prestação de Contas SDP - 4ª CRE",
+    "ErrosnoSEI-RJCancelamentoeCorreção.docx": "Guia de Erros no SEI-RJ: Cancelamento e Correção"
   };
   
-  return nameMap[filename] || filename.replace(".txt", "");
+  return nameMap[filename] || filename.replace(/\.(txt|docx)$/, "");
 }
 
 function splitIntoChunks(text: string, chunkSize: number, overlap: number): string[] {
@@ -516,6 +612,25 @@ const EXPLICIT_WEB_SEARCH_PATTERNS = [
   /\bportaria\s*n?\s*º?\s*\d+/i,
 ];
 
+// PERGUNTAS COMPARATIVAS - Gatilho obrigatório para busca web
+const COMPARATIVE_PATTERNS = [
+  /\b(diferença|diferenças)\s+(entre|de)\b/i,
+  /\b(qual\s+a?\s*relação)\s+(entre|de)\b/i,
+  /\b(comparar|comparação)\b/i,
+  /\b(vs|versus)\b/i,
+  /\b(sei-rio|seirio|sei!rio)\s+(e|vs|versus|ou)\s+(processo\.?rio|processo rio)/i,
+  /\b(processo\.?rio|processo rio)\s+(e|vs|versus|ou)\s+(sei-rio|seirio|sei!rio)/i,
+];
+
+function isComparativeQuestion(query: string): boolean {
+  for (const pattern of COMPARATIVE_PATTERNS) {
+    if (pattern.test(query)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isOutOfScope(query: string): boolean {
   const queryLower = query.toLowerCase();
   
@@ -581,7 +696,14 @@ export async function chatWithRAG(
   const lowConfidence = relevantChunks.length < 3 || 
     (relevantChunks.length > 0 && (relevantChunks[0] as any).score < 8);
   const explicitRequest = needsExplicitWebSearch(userMessage);
-  const needsWebSearch = lowConfidence || explicitRequest;
+  const isComparative = isComparativeQuestion(userMessage);
+  
+  // GATILHO OBRIGATÓRIO: perguntas comparativas SEMPRE buscam na web
+  const needsWebSearch = lowConfidence || explicitRequest || isComparative;
+  
+  if (isComparative) {
+    console.log("[RAG] Comparative question detected - mandatory web search");
+  }
   
   if (needsWebSearch) {
     console.log("[RAG] Insufficient local results, trying web search fallback...");

@@ -137,3 +137,21 @@
 - [x] Implementar tabelas estilizadas para stack e configurações
 - [x] Adicionar botão de impressão/download
 - [x] Testar responsividade e salvar checkpoint
+
+
+## Upgrade A: Ingestão de Documento DOCX
+- [x] Implementar suporte a extração de texto de arquivos DOCX
+- [x] Preservar headings (H1/H2/H3), listas e tabelas na extração
+- [x] Normalizar texto (remover quebras duplicadas, manter títulos e numerações)
+- [x] Configurar chunk size de 4000-6000 caracteres com overlap de 500
+- [x] Adicionar metadados obrigatórios (source_title, source_type, section_path, updated_at)
+- [x] Ingerir documento "ErrosnoSEI-RJCancelamentoeCorreção.docx"
+- [ ] Exibir novo documento na UI Base de Conhecimento
+- [ ] Criar teste automatizado para busca de termo exclusivo do DOCX
+
+## Upgrade B: Protocolo de Web Fallback Aprimorado
+- [x] Adicionar Regra de Ouro: NÃO INVENTAR no System Prompt
+- [x] Adicionar Regra Anti-Confusão (SEI Federal vs SEI-Rio vs Processo.Rio)
+- [x] Implementar gatilhos obrigatórios para busca web (perguntas comparativas, termos fora da base)
+- [x] Adicionar formato de resposta com lacunas (indicar explicitamente o que não foi encontrado)
+- [x] Testar com pergunta comparativa "diferença entre SEI-Rio e Processo.Rio"
