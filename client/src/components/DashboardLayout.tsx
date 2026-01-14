@@ -37,6 +37,13 @@ const DEFAULT_WIDTH = 280;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 480;
 
+/**
+ * DashboardLayout - Legacy component from authenticated version
+ * 
+ * NOTE: This component is not used in the current public-only application.
+ * It's kept for future use if authentication is added back.
+ * The `as any` type assertions are acceptable here since useAuth returns null user.
+ */
 export default function DashboardLayout({
   children,
 }: {
