@@ -7,7 +7,10 @@ export const ENV = {
   databaseUrl: process.env.DATABASE_URL ?? "",
   isProduction: process.env.NODE_ENV === "production",
   
-  // Not used in public-only mode (Google Maps removed)
+  // Google Generative AI API Key (primary for direct integration)
+  googleGenerativeAiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? "",
+  
+  // Legacy Manus Forge API (fallback for backward compatibility)
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   

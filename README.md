@@ -14,7 +14,7 @@ Sistema de chat RAG (Retrieval-Augmented Generation) independente, especializado
 
 - Node.js 18+ ou npm
 - MySQL 8+ ou MariaDB
-- Chave de API do Google Gemini (Google AI Studio)
+- **Chave de API do Google Gemini** (obtenha gratuitamente em https://aistudio.google.com/app/apikey)
 
 ## 🔧 Instalação
 
@@ -36,11 +36,25 @@ Sistema de chat RAG (Retrieval-Augmented Generation) independente, especializado
    cp .env.example .env
    ```
    
-   Edite o arquivo `.env` e configure:
+   ### Obter Chave API do Google Gemini (GRATUITA)
+   
+   1. Acesse o **Google AI Studio**: https://aistudio.google.com/app/apikey
+   2. Faça login com sua conta Google
+   3. Clique em "Create API Key" (Criar chave de API)
+   4. Copie a chave gerada
+   
+   ### Configurar o arquivo `.env`
+   
+   Edite o arquivo `.env` e configure as seguintes variáveis:
+   
+   **Obrigatório:**
    - `DATABASE_URL`: String de conexão com o MySQL
-   - `BUILT_IN_FORGE_API_URL` e `BUILT_IN_FORGE_API_KEY`: Credenciais do Manus Forge API
+   - `GOOGLE_GENERATIVE_AI_API_KEY`: Sua chave API do Google Gemini (obtida acima)
    - `JWT_SECRET`: Uma string secreta aleatória para sessões
+   
+   **Opcional:**
    - `PORT`: Porta do servidor (padrão: 3000)
+   - `BUILT_IN_FORGE_API_URL` e `BUILT_IN_FORGE_API_KEY`: Apenas se você estiver usando Manus Forge como proxy (não recomendado para uso independente)
 
 4. **Configure o banco de dados**
    ```bash
@@ -70,7 +84,12 @@ npm start
 
 2. **Configure as variáveis de ambiente no Vercel**
    - Acesse o dashboard do Vercel
-   - Adicione as mesmas variáveis do arquivo `.env` na seção de Environment Variables
+   - Vá para as configurações do projeto → Environment Variables
+   - Adicione as seguintes variáveis:
+     - `DATABASE_URL`: String de conexão com seu banco MySQL
+     - `GOOGLE_GENERATIVE_AI_API_KEY`: Sua chave API do Google Gemini
+     - `JWT_SECRET`: String aleatória segura para sessões
+     - `NODE_ENV`: `production`
 
 3. **Deploy**
    ```bash
@@ -129,6 +148,24 @@ Para adicionar novos documentos à base de conhecimento:
 - ⚠️ **Importante**: Não commite o arquivo `.env` com credenciais reais
 - Use sempre variáveis de ambiente para informações sensíveis
 - O `JWT_SECRET` deve ser uma string aleatória forte em produção
+- A chave `GOOGLE_GENERATIVE_AI_API_KEY` deve ser mantida em segredo
+
+## 🔑 Obtendo Chave API do Google Gemini
+
+O Google Gemini oferece uma **API gratuita** com limites generosos:
+
+1. **Acesse**: https://aistudio.google.com/app/apikey
+2. **Login**: Use sua conta Google
+3. **Crie**: Clique em "Create API Key" 
+4. **Copie**: A chave será mostrada apenas uma vez
+5. **Configure**: Cole no arquivo `.env` como `GOOGLE_GENERATIVE_AI_API_KEY`
+
+**Limites da API gratuita:**
+- 60 requisições por minuto
+- 1.500 requisições por dia
+- Sem custos
+
+Para limites maiores, considere o plano pago do Google AI Studio.
 
 ## 📝 Notas de Desenvolvimento
 
@@ -140,21 +177,31 @@ Este projeto foi adaptado para funcionar independentemente do sistema Manus, man
 - ✅ Simplificado para acesso público
 - ✅ Mantido sistema RAG completo
 - ✅ Mantida busca web integrada
+- ✅ **Integração direta com Google Gemini API** (sem proxy)
 
-### ⚠️ Observação sobre Integração LLM
+### 🤖 Integração LLM
 
-Atualmente, o sistema utiliza o **Manus Forge API** como proxy para o Google Gemini. Para usar este projeto independentemente:
+O sistema agora usa a **API do Google Gemini diretamente**, sem necessidade de proxies ou intermediários:
 
-**Opção 1: Usar Manus Forge (configuração atual)**
-- Requer credenciais do Manus Forge
+**✅ Modo Principal: Google Gemini Direto (Recomendado)**
+- Use sua própria chave API do Google AI Studio
+- Configure apenas `GOOGLE_GENERATIVE_AI_API_KEY` no `.env`
+- Modelo usado: `gemini-1.5-pro` (ajustável no código)
+- **100% independente e gratuito**
+
+**Modo Legado: Manus Forge Proxy (Opcional)**
+- Mantido para compatibilidade com instalações antigas
 - Configure `BUILT_IN_FORGE_API_URL` e `BUILT_IN_FORGE_API_KEY`
+- Usado automaticamente se `GOOGLE_GENERATIVE_AI_API_KEY` não estiver definido
 
-**Opção 2: Migrar para Google Gemini direto (requer modificação)**
-- Modifique `server/_core/llm.ts` para usar a SDK oficial do Google Gemini
-- Configure `GOOGLE_GENERATIVE_AI_API_KEY`
-- Remova dependências do Forge API
+### Como Funciona a Seleção:
 
-Para contribuições que implementem integração direta com Google Gemini, consulte a seção de Contribuindo.
+```
+1. Se GOOGLE_GENERATIVE_AI_API_KEY está definido → Usa Gemini direto
+2. Caso contrário → Usa Manus Forge como fallback
+```
+
+Isso garante compatibilidade retroativa mantendo a flexibilidade de uso independente.
 
 ## 🤝 Contribuindo
 
