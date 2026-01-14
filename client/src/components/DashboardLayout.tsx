@@ -37,6 +37,13 @@ const DEFAULT_WIDTH = 280;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 480;
 
+/**
+ * DashboardLayout - Legacy component from authenticated version
+ * 
+ * NOTE: This component is not used in the current public-only application.
+ * It's kept for future use if authentication is added back.
+ * The `as any` type assertions are acceptable here since useAuth returns null user.
+ */
 export default function DashboardLayout({
   children,
 }: {
@@ -207,15 +214,15 @@ function DashboardLayoutContent({
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Avatar className="h-9 w-9 border shrink-0">
                     <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
+                      {(user as any)?.name?.charAt(0).toUpperCase() || "?"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
                     <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
+                      {(user as any)?.name || "-"}
                     </p>
                     <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
+                      {(user as any)?.email || "-"}
                     </p>
                   </div>
                 </button>
