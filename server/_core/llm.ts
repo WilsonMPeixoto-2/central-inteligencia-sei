@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { GoogleGenerativeAI, Content, Part } from "@google/generative-ai";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -209,65 +210,134 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+const assertApiKey = () => {
+  if (!ENV.googleGenerativeAiApiKey && !ENV.forgeApiKey) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY or BUILT_IN_FORGE_API_KEY is not configured");
+  }
+};
+
+const shouldUseGeminiDirect = () => {
+  return ENV.googleGenerativeAiApiKey && ENV.googleGenerativeAiApiKey.trim().length > 0;
+};
+
+// Convert OpenAI-style messages to Gemini format
+const convertMessagesToGemini = (messages: Message[]): Content[] => {
+  const geminiContents: Content[] = [];
+  
+  for (const msg of messages) {
+    // Skip system messages for now - they will be handled separately
+    if (msg.role === "system") continue;
+    
+    // Map roles: user -> user, assistant -> model
+    const role = msg.role === "assistant" ? "model" : "user";
+    
+    const parts: Part[] = [];
+    const contentArray = ensureArray(msg.content);
+    
+    for (const contentPart of contentArray) {
+      if (typeof contentPart === "string") {
+        parts.push({ text: contentPart });
+      } else if (contentPart.type === "text") {
+        parts.push({ text: contentPart.text });
+      } else if (contentPart.type === "image_url") {
+        // For images, we need base64 data
+        // Note: Gemini expects inline data or file references
+        console.warn("[LLM] Image content not fully supported in Gemini conversion");
+        parts.push({ text: "[Image content]" });
+      } else if (contentPart.type === "file_url") {
+        console.warn("[LLM] File content not fully supported in Gemini conversion");
+        parts.push({ text: "[File content]" });
+      }
+    }
+    
+    if (parts.length > 0) {
+      geminiContents.push({ role, parts });
+    }
+  }
+  
+  return geminiContents;
+};
+
+// Invoke LLM using Google Gemini SDK directly
+async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
+  const genAI = new GoogleGenerativeAI(ENV.googleGenerativeAiApiKey);
+  
+  // Use gemini-1.5-pro as the primary model
+  const modelName = "gemini-1.5-pro";
+  const model = genAI.getGenerativeModel({ model: modelName });
+  
+  const { messages } = params;
+  
+  // Extract system message if present
+  const systemMessages = messages.filter(m => m.role === "system");
+  const systemInstruction = systemMessages.map(m => {
+    const content = ensureArray(m.content);
+    return content.map(c => typeof c === "string" ? c : c.type === "text" ? c.text : "").join("\n");
+  }).join("\n\n");
+  
+  // Convert remaining messages to Gemini format
+  const geminiContents = convertMessagesToGemini(messages);
+  
+  // Start a chat session with history
+  const chat = model.startChat({
+    history: geminiContents.slice(0, -1), // All but the last message
+    generationConfig: {
+      temperature: 0.5,
+      maxOutputTokens: 8192,
+    },
+    systemInstruction: systemInstruction || undefined,
+  });
+  
+  // Get the last user message
+  const lastMessage = geminiContents[geminiContents.length - 1];
+  if (!lastMessage || lastMessage.role !== "user") {
+    throw new Error("Last message must be from user");
+  }
+  
+  const prompt = lastMessage.parts.map(p => {
+    if ('text' in p) return p.text;
+    return "";
+  }).join("\n");
+  
+  try {
+    const result = await chat.sendMessage(prompt);
+    const response = result.response;
+    const text = response.text();
+    
+    // Convert Gemini response to OpenAI-compatible format
+    return {
+      id: `gemini-${Date.now()}`,
+      created: Math.floor(Date.now() / 1000),
+      model: modelName,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: text,
+          },
+          finish_reason: "stop",
+        },
+      ],
+      usage: {
+        prompt_tokens: 0, // Gemini doesn't provide token counts in the same way
+        completion_tokens: 0,
+        total_tokens: 0,
+      },
+    };
+  } catch (error: any) {
+    console.error("[LLM] Gemini API error:", error);
+    throw new Error(`Gemini API error: ${error.message || "Unknown error"}`);
+  }
+}
+
+// Legacy implementation using Manus Forge proxy
 const resolveApiUrl = () =>
   ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
     ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
     : "https://forge.manus.im/v1/chat/completions";
 
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-};
-
-const normalizeResponseFormat = ({
-  responseFormat,
-  response_format,
-  outputSchema,
-  output_schema,
-}: {
-  responseFormat?: ResponseFormat;
-  response_format?: ResponseFormat;
-  outputSchema?: OutputSchema;
-  output_schema?: OutputSchema;
-}):
-  | { type: "json_schema"; json_schema: JsonSchema }
-  | { type: "text" }
-  | { type: "json_object" }
-  | undefined => {
-  const explicitFormat = responseFormat || response_format;
-  if (explicitFormat) {
-    if (
-      explicitFormat.type === "json_schema" &&
-      !explicitFormat.json_schema?.schema
-    ) {
-      throw new Error(
-        "responseFormat json_schema requires a defined schema object"
-      );
-    }
-    return explicitFormat;
-  }
-
-  const schema = outputSchema || output_schema;
-  if (!schema) return undefined;
-
-  if (!schema.name || !schema.schema) {
-    throw new Error("outputSchema requires both name and schema");
-  }
-
-  return {
-    type: "json_schema",
-    json_schema: {
-      name: schema.name,
-      schema: schema.schema,
-      ...(typeof schema.strict === "boolean" ? { strict: schema.strict } : {}),
-    },
-  };
-};
-
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
-
+async function invokeForgeProxy(params: InvokeParams): Promise<InvokeResult> {
   const {
     messages,
     tools,
@@ -379,4 +449,63 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
 
   return (await response.json()) as InvokeResult;
+}
+
+const normalizeResponseFormat = ({
+  responseFormat,
+  response_format,
+  outputSchema,
+  output_schema,
+}: {
+  responseFormat?: ResponseFormat;
+  response_format?: ResponseFormat;
+  outputSchema?: OutputSchema;
+  output_schema?: OutputSchema;
+}):
+  | { type: "json_schema"; json_schema: JsonSchema }
+  | { type: "text" }
+  | { type: "json_object" }
+  | undefined => {
+  const explicitFormat = responseFormat || response_format;
+  if (explicitFormat) {
+    if (
+      explicitFormat.type === "json_schema" &&
+      !explicitFormat.json_schema?.schema
+    ) {
+      throw new Error(
+        "responseFormat json_schema requires a defined schema object"
+      );
+    }
+    return explicitFormat;
+  }
+
+  const schema = outputSchema || output_schema;
+  if (!schema) return undefined;
+
+  if (!schema.name || !schema.schema) {
+    throw new Error("outputSchema requires both name and schema");
+  }
+
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: schema.name,
+      schema: schema.schema,
+      ...(typeof schema.strict === "boolean" ? { strict: schema.strict } : {}),
+    },
+  };
+};
+
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  assertApiKey();
+
+  // Use direct Gemini integration if API key is available
+  if (shouldUseGeminiDirect()) {
+    console.log("[LLM] Using direct Google Gemini API");
+    return invokeGeminiDirect(params);
+  }
+
+  // Fallback to Forge proxy if Gemini key not available
+  console.log("[LLM] Using Manus Forge proxy");
+  return invokeForgeProxy(params);
 }
