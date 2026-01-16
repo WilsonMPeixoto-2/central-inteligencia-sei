@@ -1,13 +1,21 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter } from '../../server/routers';
-import { createContext } from '../../server/_core/context';
+import type { TrpcContext } from '../../server/_core/context';
 
 const handler = async (req: Request) => {
   return fetchRequestHandler({
     endpoint: '/api/trpc',
     req,
     router: appRouter,
-    createContext: () => createContext({ req: req as any, res: {} as any }),
+    createContext: async (): Promise<TrpcContext> => {
+      // In serverless environment, we don't have req/res objects
+      // Context is simplified for public access
+      return {
+        req: req as any,
+        res: {} as any,
+        user: null,
+      };
+    },
   });
 };
 
