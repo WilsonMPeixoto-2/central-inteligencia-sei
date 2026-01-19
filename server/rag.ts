@@ -311,8 +311,12 @@ function expandQueryWithSynonyms(query: string): string[] {
 export function loadKnowledgeBase() {
   const knowledgeDir = path.join(process.cwd(), "knowledge-base");
   
+  console.log(`[RAG] Looking for knowledge base at: ${knowledgeDir}`);
+  console.log(`[RAG] Current working directory: ${process.cwd()}`);
+  
   if (!fs.existsSync(knowledgeDir)) {
-    console.warn("[RAG] Knowledge base directory not found");
+    console.error("[RAG] ❌ Knowledge base directory NOT FOUND at:", knowledgeDir);
+    console.error("[RAG] Please ensure the 'knowledge-base' folder exists with .txt files");
     return;
   }
   
@@ -346,6 +350,9 @@ export function loadKnowledgeBase() {
   
   // Carregar arquivos DOCX de forma assíncrona
   loadDocxFiles(knowledgeDir, docxFiles);
+  
+  // Log de sucesso
+  console.log(`[RAG] ✅ Knowledge base loaded successfully with ${knowledgeBase.length} chunks`);
 }
 
 // Carregar arquivos DOCX de forma assíncrona
@@ -708,6 +715,21 @@ export async function chatWithRAG(
   userMessage: string,
   conversationHistory: { role: "user" | "assistant"; content: string }[] = []
 ): Promise<{ response: string; sources: { documentTitle: string; section?: string; link?: string }[]; usedWebSearch: boolean }> {
+  
+  // Verificar se a knowledge base está carregada
+  if (knowledgeBase.length === 0) {
+    loadKnowledgeBase();
+    
+    // Se ainda estiver vazia após tentar carregar
+    if (knowledgeBase.length === 0) {
+      console.warn("[RAG] Knowledge base is empty after load attempt");
+      return {
+        response: "⚠️ **Base de conhecimento não carregada.**\n\nA base de documentos não foi encontrada ou está vazia. Verifique se a pasta `knowledge-base` existe e contém os arquivos de texto necessários.\n\n**Arquivos esperados:**\n- cartilha_sei_content.txt\n- manual_sei_4_content.txt\n- manual_usuario_sei_content.txt\n- pdf_content.txt",
+        sources: [],
+        usedWebSearch: false
+      };
+    }
+  }
   
   // Verificar se está fora do escopo
   if (isOutOfScope(userMessage)) {

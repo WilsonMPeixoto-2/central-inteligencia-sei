@@ -61,12 +61,22 @@ export default function Home() {
     },
     onError: (error) => {
       console.error("Error sending message:", error);
+      
+      let errorMessage = "Desculpe, ocorreu um erro ao processar sua pergunta.";
+      
+      // Verificar tipo de erro
+      if (error.message?.includes("fetch")) {
+        errorMessage = "⚠️ **Erro de conexão.**\n\nNão foi possível conectar ao servidor. Verifique sua conexão com a internet ou tente novamente em alguns instantes.";
+      } else if (error.message?.includes("500")) {
+        errorMessage = "⚠️ **Erro interno do servidor.**\n\nO servidor encontrou um problema. Por favor, tente novamente ou contate o suporte se o problema persistir.";
+      }
+      
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now(),
           role: "assistant",
-          content: "Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente.",
+          content: errorMessage,
         },
       ]);
       setIsLoading(false);
