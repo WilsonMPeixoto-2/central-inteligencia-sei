@@ -168,7 +168,11 @@ export async function getChunksByDocumentId(documentId: number) {
 // Chat session functions
 export async function getOrCreateChatSession(sessionId: string, userId?: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) {
+    console.warn("[Database] Cannot create chat session: database not available");
+    // Return mock object to allow functioning without DB
+    return { id: 0, sessionId, userId: null, createdAt: new Date() };
+  }
   
   const existing = await db.select().from(chatSessions).where(eq(chatSessions.sessionId, sessionId)).limit(1);
   
@@ -183,14 +187,20 @@ export async function getOrCreateChatSession(sessionId: string, userId?: number)
 
 export async function addChatMessage(message: InsertChatMessage) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) {
+    console.warn("[Database] Cannot add chat message: database not available");
+    return; // Return silently instead of throwing error
+  }
   
   await db.insert(chatMessages).values(message);
 }
 
 export async function getChatHistory(sessionId: string, limit = 20) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    console.warn("[Database] Cannot get chat history: database not available");
+    return []; // Return empty array instead of throwing error
+  }
   
   return db
     .select()

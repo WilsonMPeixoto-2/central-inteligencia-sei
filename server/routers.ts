@@ -6,7 +6,8 @@ import {
   getAllDocuments, 
   addChatMessage, 
   getChatHistory,
-  getOrCreateChatSession
+  getOrCreateChatSession,
+  getDb
 } from "./db";
 import { nanoid } from "nanoid";
 
@@ -24,43 +25,74 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const sessionId = input.sessionId || nanoid();
         
-        // Get or create session
-        await getOrCreateChatSession(sessionId, ctx.user?.id);
-        
-        // Get conversation history
-        const historyMessages = await getChatHistory(sessionId, 10);
-        const conversationHistory = historyMessages
-          .reverse()
-          .map(m => ({
-            role: m.role as "user" | "assistant",
-            content: m.content
-          }));
-        
-        // Save user message
-        await addChatMessage({
-          sessionId,
-          role: "user",
-          content: input.message,
-          sources: null
-        });
-        
-        // Get AI response with RAG
-        const { response, sources, usedWebSearch } = await chatWithRAG(input.message, conversationHistory);
-        
-        // Save assistant response
-        await addChatMessage({
-          sessionId,
-          role: "assistant",
-          content: response,
-          sources
-        });
-        
-        return {
-          sessionId,
-          response,
-          sources,
-          usedWebSearch
-        };
+        try {
+          // Get or create session
+          await getOrCreateChatSession(sessionId, ctx.user?.id);
+          
+          // Get conversation history
+          const historyMessages = await getChatHistory(sessionId, 10);
+          const conversationHistory = historyMessages
+            .reverse()
+            .map(m => ({
+              role: m.role as "user" | "assistant",
+              content: m.content
+            }));
+          
+          // Save user message
+          await addChatMessage({
+            sessionId,
+            role: "user",
+            content: input.message,
+            sources: null
+          });
+          
+          // Get AI response with RAG
+          const { response, sources, usedWebSearch } = await chatWithRAG(input.message, conversationHistory);
+          
+          // Save assistant response
+          await addChatMessage({
+            sessionId,
+            role: "assistant",
+            content: response,
+            sources
+          });
+          
+          return {
+            sessionId,
+            response,
+            sources,
+            usedWebSearch
+          };
+        } catch (error: any) {
+          console.error("[Chat] Error:", error);
+          
+          // Return user-friendly message instead of generic error
+          if (error.message?.includes("API_KEY") || error.message?.includes("not configured")) {
+            return {
+              sessionId: sessionId,
+              response: "⚠️ **Configuração de IA não encontrada.**\n\nO serviço de inteligência artificial não está configurado corretamente. Por favor, configure a variável de ambiente `GOOGLE_GENERATIVE_AI_API_KEY` ou contate o administrador do sistema.",
+              sources: [],
+              usedWebSearch: false
+            };
+          }
+          
+          if (error.message?.includes("Database not available")) {
+            return {
+              sessionId: sessionId,
+              response: "⚠️ **Banco de dados não disponível.**\n\nO sistema não conseguiu conectar ao banco de dados. Por favor, verifique se a variável `DATABASE_URL` está configurada corretamente.",
+              sources: [],
+              usedWebSearch: false
+            };
+          }
+          
+          // Generic error message
+          return {
+            sessionId: sessionId,
+            response: "⚠️ **Erro ao processar sua pergunta.**\n\nOcorreu um erro inesperado. Por favor, tente novamente em alguns instantes.",
+            sources: [],
+            usedWebSearch: false
+          };
+        }
       }),
 
     // Get chat history for a session
@@ -108,6 +140,53 @@ export const appRouter = router({
     reload: publicProcedure.mutation(() => {
       loadKnowledgeBase();
       return { success: true };
+    }),
+  }),
+
+  // Health check router
+  health: router({
+    check: publicProcedure.query(async () => {
+      const checks = {
+        timestamp: new Date().toISOString(),
+        status: "ok" as "ok" | "degraded" | "error",
+        services: {
+          database: false,
+          knowledgeBase: false,
+          aiService: false,
+        },
+        errors: [] as string[],
+      };
+      
+      // Check database availability
+      try {
+        const db = await getDb();
+        checks.services.database = db !== null;
+        if (!db) checks.errors.push("DATABASE_URL not configured");
+      } catch (e) {
+        checks.errors.push("Database connection failed");
+      }
+      
+      // Check knowledge base
+      const kbResults = searchKnowledgeBase("test", 1);
+      const kbLoaded = kbResults.length > 0;
+      checks.services.knowledgeBase = kbLoaded;
+      if (!kbLoaded) checks.errors.push("Knowledge base not loaded");
+      
+      // Check AI service configuration
+      const hasAiKey = !!(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.BUILT_IN_FORGE_API_KEY);
+      checks.services.aiService = hasAiKey;
+      if (!hasAiKey) checks.errors.push("AI API key not configured");
+      
+      // Determine overall status
+      if (checks.errors.length === 0) {
+        checks.status = "ok";
+      } else if (checks.services.aiService) {
+        checks.status = "degraded";
+      } else {
+        checks.status = "error";
+      }
+      
+      return checks;
     }),
   }),
 });
