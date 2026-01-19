@@ -14,6 +14,7 @@ interface KnowledgeChunk {
 }
 
 let knowledgeBase: KnowledgeChunk[] = [];
+let isLoadingKnowledgeBase = false;
 
 // ============================================================================
 // SYSTEM PROMPT - CLARA - Consultora de Legislação e Apoio a Rotinas Administrativas
@@ -309,6 +310,14 @@ function expandQueryWithSynonyms(query: string): string[] {
 // ============================================================================
 
 export function loadKnowledgeBase() {
+  // Prevent concurrent loading
+  if (isLoadingKnowledgeBase) {
+    console.log("[RAG] Knowledge base is already being loaded, skipping...");
+    return;
+  }
+  
+  isLoadingKnowledgeBase = true;
+  
   const knowledgeDir = path.join(process.cwd(), "knowledge-base");
   
   console.log(`[RAG] Looking for knowledge base at: ${knowledgeDir}`);
@@ -317,6 +326,7 @@ export function loadKnowledgeBase() {
   if (!fs.existsSync(knowledgeDir)) {
     console.error("[RAG] ❌ Knowledge base directory NOT FOUND at:", knowledgeDir);
     console.error("[RAG] Please ensure the 'knowledge-base' folder exists with .txt files");
+    isLoadingKnowledgeBase = false;
     return;
   }
   
@@ -353,6 +363,8 @@ export function loadKnowledgeBase() {
   
   // Log success
   console.log(`[RAG] ✅ Knowledge base loaded successfully with ${knowledgeBase.length} chunks`);
+  
+  isLoadingKnowledgeBase = false;
 }
 
 // Load DOCX files asynchronously
@@ -724,7 +736,7 @@ export async function chatWithRAG(
     if (knowledgeBase.length === 0) {
       console.warn("[RAG] Knowledge base is empty after load attempt");
       return {
-        response: "⚠️ **Base de conhecimento não carregada.**\n\nA base de documentos não foi encontrada ou está vazia. Verifique se a pasta `knowledge-base` existe e contém os arquivos de texto necessários.\n\n**Arquivos esperados:**\n- cartilha_sei_content.txt\n- manual_sei_4_content.txt\n- manual_usuario_sei_content.txt\n- pdf_content.txt",
+        response: "⚠️ **Base de conhecimento não carregada.**\n\nA base de documentos não foi encontrada ou está vazia. Verifique se a pasta `knowledge-base` existe e contém arquivos de texto (.txt) ou documentos Word (.docx) necessários.",
         sources: [],
         usedWebSearch: false
       };
