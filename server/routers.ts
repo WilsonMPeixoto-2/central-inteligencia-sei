@@ -66,7 +66,7 @@ export const appRouter = router({
         } catch (error: any) {
           console.error("[Chat] Error:", error);
           
-          // Retornar mensagem amigável em vez de erro genérico
+          // Return user-friendly message instead of generic error
           if (error.message?.includes("API_KEY") || error.message?.includes("not configured")) {
             return {
               sessionId: sessionId,
@@ -85,7 +85,7 @@ export const appRouter = router({
             };
           }
           
-          // Erro genérico
+          // Generic error message
           return {
             sessionId: sessionId,
             response: "⚠️ **Erro ao processar sua pergunta.**\n\nOcorreu um erro inesperado. Por favor, tente novamente em alguns instantes.",
@@ -157,7 +157,7 @@ export const appRouter = router({
         errors: [] as string[],
       };
       
-      // Verificar banco de dados
+      // Check database availability
       try {
         const db = await getDb();
         checks.services.database = db !== null;
@@ -166,18 +166,18 @@ export const appRouter = router({
         checks.errors.push("Database connection failed");
       }
       
-      // Verificar knowledge base
+      // Check knowledge base
       const kbResults = searchKnowledgeBase("test", 1);
       const kbLoaded = kbResults.length > 0;
       checks.services.knowledgeBase = kbLoaded;
       if (!kbLoaded) checks.errors.push("Knowledge base not loaded");
       
-      // Verificar configuração de IA
+      // Check AI service configuration
       const hasAiKey = !!(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.BUILT_IN_FORGE_API_KEY);
       checks.services.aiService = hasAiKey;
       if (!hasAiKey) checks.errors.push("AI API key not configured");
       
-      // Determinar status geral
+      // Determine overall status
       if (checks.errors.length === 0) {
         checks.status = "ok";
       } else if (checks.services.aiService) {

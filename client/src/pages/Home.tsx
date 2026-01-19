@@ -64,7 +64,7 @@ export default function Home() {
       
       let errorMessage = "Desculpe, ocorreu um erro ao processar sua pergunta.";
       
-      // Verificar tipo de erro
+      // Check error type
       if (error.message?.includes("fetch")) {
         errorMessage = "⚠️ **Erro de conexão.**\n\nNão foi possível conectar ao servidor. Verifique sua conexão com a internet ou tente novamente em alguns instantes.";
       } else if (error.message?.includes("500")) {

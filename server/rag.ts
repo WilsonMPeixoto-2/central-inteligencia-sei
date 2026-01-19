@@ -348,14 +348,14 @@ export function loadKnowledgeBase() {
   
   console.log(`[RAG] Loaded ${knowledgeBase.length} chunks from ${txtFiles.length} TXT files`);
   
-  // Carregar arquivos DOCX de forma assíncrona
+  // Load DOCX files asynchronously
   loadDocxFiles(knowledgeDir, docxFiles);
   
-  // Log de sucesso
+  // Log success
   console.log(`[RAG] ✅ Knowledge base loaded successfully with ${knowledgeBase.length} chunks`);
 }
 
-// Carregar arquivos DOCX de forma assíncrona
+// Load DOCX files asynchronously
 async function loadDocxFiles(knowledgeDir: string, docxFiles: string[]) {
   for (const file of docxFiles) {
     try {
@@ -392,16 +392,16 @@ async function loadDocxFiles(knowledgeDir: string, docxFiles: string[]) {
   console.log(`[RAG] Total knowledge base: ${knowledgeBase.length} chunks`);
 }
 
-// Normalizar texto extraído de DOCX
+// Normalize text extracted from DOCX
 function normalizeDocxText(text: string): string {
   return text
-    // Remover quebras de linha duplicadas
+    // Remove duplicate line breaks
     .replace(/\n{3,}/g, '\n\n')
-    // Preservar títulos e numerações
+    // Preserve titles and numbering
     .replace(/^(\d+\.\s+)/gm, '\n$1')
-    // Remover espaços extras
+    // Remove extra spaces
     .replace(/[ \t]+/g, ' ')
-    // Limpar início e fim
+    // Clean start and end
     .trim();
 }
 
@@ -716,11 +716,11 @@ export async function chatWithRAG(
   conversationHistory: { role: "user" | "assistant"; content: string }[] = []
 ): Promise<{ response: string; sources: { documentTitle: string; section?: string; link?: string }[]; usedWebSearch: boolean }> {
   
-  // Verificar se a knowledge base está carregada
+  // Check if knowledge base is loaded
   if (knowledgeBase.length === 0) {
     loadKnowledgeBase();
     
-    // Se ainda estiver vazia após tentar carregar
+    // If still empty after attempting to load
     if (knowledgeBase.length === 0) {
       console.warn("[RAG] Knowledge base is empty after load attempt");
       return {
@@ -731,7 +731,7 @@ export async function chatWithRAG(
     }
   }
   
-  // Verificar se está fora do escopo
+  // Check if query is out of scope
   if (isOutOfScope(userMessage)) {
     console.log("[RAG] Query detected as out of scope");
     return {

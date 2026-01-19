@@ -170,7 +170,7 @@ export async function getOrCreateChatSession(sessionId: string, userId?: number)
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot create chat session: database not available");
-    // Retornar objeto mock para permitir funcionamento sem DB
+    // Return mock object to allow functioning without DB
     return { id: 0, sessionId, userId: null, createdAt: new Date() };
   }
   
@@ -189,7 +189,7 @@ export async function addChatMessage(message: InsertChatMessage) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot add chat message: database not available");
-    return; // Retorna silenciosamente em vez de lançar erro
+    return; // Return silently instead of throwing error
   }
   
   await db.insert(chatMessages).values(message);
@@ -199,7 +199,7 @@ export async function getChatHistory(sessionId: string, limit = 20) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot get chat history: database not available");
-    return []; // Retorna array vazio em vez de lançar erro
+    return []; // Return empty array instead of throwing error
   }
   
   return db
