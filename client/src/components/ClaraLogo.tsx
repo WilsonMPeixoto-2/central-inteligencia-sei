@@ -5,6 +5,24 @@ interface ClaraLogoProps {
   variant?: "default" | "light";
 }
 
+// Color schemes for different variants - defined outside to avoid recreation
+const COLOR_SCHEMES = {
+  default: {
+    primary: "#1e3a8a",
+    secondary: "#1e3a8a", 
+    accent: "#f59e0b",
+    bg: "rgba(30, 58, 138, 0.1)",
+    stroke: "white"
+  },
+  light: {
+    primary: "#ffffff",
+    secondary: "#ffffff",
+    accent: "#f59e0b",
+    bg: "rgba(255, 255, 255, 0.1)",
+    stroke: "white"
+  }
+} as const;
+
 /**
  * CLARA Logo Component - Origami-inspired design
  * Represents intelligence and precision through geometric shapes
@@ -16,20 +34,7 @@ export default function ClaraLogo({
   title = "CLARA - Consultora de Legislação e Apoio a Rotinas Administrativas",
   variant = "default"
 }: ClaraLogoProps) {
-  // Color scheme based on variant
-  const colors = variant === "light" 
-    ? {
-        primary: "#ffffff",
-        secondary: "#ffffff",
-        accent: "#f59e0b",
-        bg: "rgba(255, 255, 255, 0.1)"
-      }
-    : {
-        primary: "#1e3a8a",
-        secondary: "#1e3a8a", 
-        accent: "#f59e0b",
-        bg: "rgba(30, 58, 138, 0.1)"
-      };
+  const colors = COLOR_SCHEMES[variant];
   
   return (
     <svg
@@ -88,16 +93,16 @@ export default function ClaraLogo({
         opacity="0.3"
       />
       
-      {/* Highlight Lines - White for depth */}
+      {/* Highlight Lines - for depth */}
       <path
         d="M24 18 L24 42"
-        stroke={variant === "light" ? "white" : "white"}
+        stroke={colors.stroke}
         strokeWidth="0.5"
         opacity="0.4"
       />
       <path
         d="M17 30 L31 30"
-        stroke={variant === "light" ? "white" : "white"}
+        stroke={colors.stroke}
         strokeWidth="0.5"
         opacity="0.4"
       />
@@ -105,7 +110,7 @@ export default function ClaraLogo({
       {/* Letter C - Stylized in center */}
       <path
         d="M26 24 A4 4 0 1 0 26 30"
-        stroke={variant === "light" ? "white" : "white"}
+        stroke={colors.stroke}
         strokeWidth="2"
         strokeLinecap="round"
         fill="none"
