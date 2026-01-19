@@ -672,18 +672,19 @@ function sanitizeSourceDuplication(response: string): string {
   // Remover blocos de fontes que o LLM pode ter adicionado no corpo
   let sanitized = response;
   
-  // Padrões para detectar blocos de fonte no corpo da resposta
+  // Padrões otimizados para detectar blocos de fonte no corpo da resposta
+  // Usando padrões específicos para evitar catastrophic backtracking
   const sourcePatterns = [
-    // "Fonte:" ou "Fontes:" no início de linha ou após newline, com ou sem conteúdo na mesma linha
-    /(?:^|[\n])[\s]*Fontes?:\s*.*$/gim,
-    // "Fonte:" seguido de lista com bullets (usando non-capturing group para evitar backtracking)
-    /[\n][\s]*Fontes?:\s*[\n][\s]*[-•*]\s+.+(?:[\n][\s]*[-•*]\s+.+)*/gim,
-    // Seção completa de fontes (título + conteúdo)
-    /[\n][\s]*#{1,4}\s*Fontes?\s*consultadas?\s*:?\s*[\n][\s\S]*?(?=[\n]#{1,4}\s|[\n][\n][A-Z]|$)/gim,
+    // "Fonte:" ou "Fontes:" no início de linha ou após newline, com conteúdo opcional
+    /(?:^|\n)\s*Fontes?:\s*[^\n]*$/gim,
+    // "Fonte:" seguido de lista com bullets (padrão específico, não-greedy)
+    /\n\s*Fontes?:\s*\n\s*[-•*]\s+[^\n]+(?:\n\s*[-•*]\s+[^\n]+)*/gim,
+    // Seção completa de fontes (título + algumas linhas de conteúdo)
+    /\n\s*#{1,4}\s*Fontes?\s*consultadas?\s*:?\s*\n[^\n]*(?:\n[^\n]*){0,20}?(?=\n#{1,4}\s|\n\n[A-Z]|$)/gim,
     // Referências explícitas como "[Fonte: ...]"
     /\[Fonte:\s*[^\]]+\]/gi,
-    // Padrão "Fontes consultadas:" seguido de conteúdo até o próximo parágrafo
-    /[\n][\s]*Fontes?\s+consultadas?:?\s*[\n][\s\S]*?(?=[\n][\n]|$)/gim,
+    // Padrão "Fontes consultadas:" seguido de conteúdo (limitado a 20 linhas)
+    /\n\s*Fontes?\s+consultadas?:?\s*\n[^\n]*(?:\n[^\n]*){0,20}?(?=\n\n|$)/gim,
   ];
   
   for (const pattern of sourcePatterns) {
