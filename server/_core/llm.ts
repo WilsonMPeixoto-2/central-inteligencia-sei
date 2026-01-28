@@ -294,7 +294,7 @@ async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
     throw new Error("Last message must be from user");
   }
   
-  const prompt = lastMessage.parts.map(p => {
+  const prompt = lastMessage.parts.map((p: any) => {
     if ('text' in p) return p.text;
     return "";
   }).join("\n");

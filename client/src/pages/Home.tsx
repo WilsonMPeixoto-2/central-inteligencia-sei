@@ -28,11 +28,11 @@ interface ChatMessage {
 }
 
 const EXAMPLE_QUESTIONS = [
-  { icon: FileSearch, text: "Abrir um processo no SEI" },
+  { icon: FileSearch, text: "Abrir um processo no sistema" },
   { icon: ClipboardList, text: "Anexar documentos externos" },
-  { icon: BookOpen, text: "Fazer a prestação de contas do SDP" },
-  { icon: HelpCircle, text: "Consultar níveis de acesso no SEI" },
-  { icon: FileText, text: "Assinar e autenticar documentos no SEI" },
+  { icon: BookOpen, text: "Consultar procedimentos administrativos" },
+  { icon: HelpCircle, text: "Verificar níveis de acesso" },
+  { icon: FileText, text: "Assinar e autenticar documentos" },
   { icon: FileSearch, text: "Tramitar processo para outra unidade" },
 ];
 
@@ -169,7 +169,7 @@ export default function Home() {
                     </h2>
                     <p className="text-muted-foreground max-w-md mb-8">
                       Sou sua consultora especializada em legislação e rotinas administrativas, 
-                      com foco no Sistema SEI e procedimentos de prestação de contas do SDP. 
+                      com foco em sistemas institucionais e procedimentos administrativos. 
                       Como posso ajudá-lo hoje?
                     </p>
                     
@@ -293,7 +293,7 @@ export default function Home() {
                       e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
                     }}
                     onKeyDown={handleKeyPress}
-                    placeholder="💬 Digite sua pergunta sobre o SEI ou SDP aqui..."
+                    placeholder="💬 Digite sua pergunta sobre sistemas administrativos aqui..."
                     disabled={isLoading}
                     rows={3}
                     className="w-full min-h-[80px] max-h-[200px] p-4 pr-16 bg-transparent text-foreground placeholder:text-muted-foreground/70 resize-none focus:outline-none text-base leading-relaxed"
@@ -312,7 +312,7 @@ export default function Home() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3 text-center">
-                  As respostas são baseadas em manuais e guias do SEI inseridos na base de conhecimento.
+                  As respostas são baseadas em documentação oficial inserida na base de conhecimento.
                 </p>
               </CardContent>
             </Card>
@@ -339,13 +339,13 @@ export default function Home() {
                     status="indexed"
                   />
                   <DocumentItem 
-                    title="Manual de Prestação de Contas SDP"
-                    description="Procedimentos para prestação de contas da 4ª CRE"
+                    title="Manual de Procedimentos Administrativos"
+                    description="Procedimentos para gestão administrativa"
                     status="indexed"
                   />
                   <DocumentItem 
-                    title="Guia Orientador SDP"
-                    description="Circular E/SUBG/CPGOF Nº 06/2024"
+                    title="Guia de Orientações Administrativas"
+                    description="Diretrizes para procedimentos institucionais"
                     status="indexed"
                   />
                 </div>
@@ -361,13 +361,13 @@ export default function Home() {
                     Sobre este assistente
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed text-justify" style={{ lineHeight: '1.6' }}>
-                    Ferramenta em desenvolvimento pela 4ª CRE, em fase de validação 
-                    e aprimoramento, voltada ao apoio operacional na utilização do 
-                    Sistema Eletrônico de Informações (SEI).
+                    Projeto de inteligência artificial especializada em sistemas institucionais, 
+                    em fase de validação e aprimoramento, voltado ao apoio operacional na 
+                    utilização de procedimentos administrativos.
                   </p>
                   <p className="text-xs text-muted-foreground leading-relaxed text-justify mt-2 font-medium" style={{ lineHeight: '1.6' }}>
-                    Este ambiente não constitui canal oficial do Município do Rio de Janeiro 
-                    ou do sistema SEI!RIO, nem substitui orientações formais.
+                    Este ambiente é uma ferramenta de suporte e não constitui canal oficial, 
+                    nem substitui orientações formais de órgãos competentes.
                   </p>
                 </div>
 
@@ -394,10 +394,9 @@ export default function Home() {
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed text-justify" style={{ lineHeight: '1.6' }}>
                     O conteúdo gerado baseia-se na documentação oficial inserida na 
-                    base de conhecimento (manuais e guias do SEI Federal e da instância 
-                    SEI!RIO utilizada no Município do Rio de Janeiro). O assistente 
-                    limita-se a orientações sobre o SEI e a normas administrativas 
-                    diretamente correlatas ao uso do sistema.
+                    base de conhecimento. O assistente limita-se a orientações sobre 
+                    procedimentos administrativos e normas correlatas ao uso de sistemas 
+                    institucionais.
                   </p>
                 </div>
 
@@ -409,9 +408,9 @@ export default function Home() {
                   <p className="text-xs text-muted-foreground leading-relaxed text-justify" style={{ lineHeight: '1.6' }}>
                     Na ausência de base documental interna suficiente, o assistente 
                     poderá consultar fontes externas oficiais (preferencialmente .gov.br 
-                    e repositórios normativos), mantendo o tema restrito ao SEI e normas 
-                    correlatas. Quando utilizar fontes externas, os links serão indicados 
-                    na resposta.
+                    e repositórios normativos), mantendo o tema restrito a procedimentos 
+                    administrativos e normas correlatas. Quando utilizar fontes externas, 
+                    os links serão indicados na resposta.
                   </p>
                 </div>
               </CardContent>
@@ -424,7 +423,7 @@ export default function Home() {
       <footer className="bg-card border-t py-3">
         <div className="container">
           <p className="text-center text-xs text-muted-foreground">
-            CLARA — Consultora de Legislação e Apoio a Rotinas Administrativas — Projeto em desenvolvimento pela 4ª CRE — Versão de testes
+            CLARA — Consultora de Legislação e Apoio a Rotinas Administrativas — Projeto de inteligência artificial — Versão de testes
           </p>
           <p className="text-center text-[10px] text-muted-foreground/60 mt-1">
             Uso interno orientativo — sujeito a validação por fontes oficiais
