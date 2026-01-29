@@ -1,4 +1,3 @@
-import { ENV } from "./env";
 import { GoogleGenerativeAI, Content, Part } from "@google/generative-ai";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
@@ -50,7 +49,6 @@ export type ToolChoiceExplicit = {
     name: string;
   };
 };
-
 export type ToolChoice =
   | ToolChoicePrimitive
   | ToolChoiceByName
@@ -153,29 +151,22 @@ const normalizeMessage = (message: Message) => {
     };
   }
 
-  const contentParts = ensureArray(message.content).map(normalizeContentPart);
-
-  // If there's only text content, collapse to a single string for compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return {
-      role,
-      name,
-      content: contentParts[0].text,
-    };
-  }
+  const content = ensureArray(message.content).map(normalizeContentPart);
 
   return {
     role,
+    content,
     name,
-    content: contentParts,
   };
 };
 
 const normalizeToolChoice = (
   toolChoice: ToolChoice | undefined,
   tools: Tool[] | undefined
-): "none" | "auto" | ToolChoiceExplicit | undefined => {
-  if (!toolChoice) return undefined;
+): ToolChoice | undefined => {
+  if (!toolChoice) {
+    return undefined;
+  }
 
   if (toolChoice === "none" || toolChoice === "auto") {
     return toolChoice;
@@ -262,45 +253,61 @@ const convertMessagesToGemini = (messages: Message[]): Content[] => {
 async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
   const genAI = new GoogleGenerativeAI(ENV.googleGenerativeAiApiKey);
   
-  // Use gemini-1.5-pro as the primary model
-  const modelName = "gemini-1.5-pro";
+  // Use gemini-2.0-flash as the primary model
+  const modelName = "gemini-2.0-flash";
   const model = genAI.getGenerativeModel({ model: modelName });
   
   const { messages } = params;
   
   // Extract system message if present
   const systemMessages = messages.filter(m => m.role === "system");
-  const systemInstruction = systemMessages.map(m => {
-    const content = ensureArray(m.content);
-    return content.map(c => typeof c === "string" ? c : c.type === "text" ? c.text : "").join("\n");
-  }).join("\n\n");
+  let systemInstruction = "";
+  if (systemMessages.length > 0) {
+    systemInstruction = systemMessages.map(m => {
+      const content = ensureArray(m.content);
+      return content.map(c => typeof c === "string" ? c : c.type === "text" ? c.text : "").join("\n");
+    }).join("\n\n");
+  }
   
   // Convert remaining messages to Gemini format
   const geminiContents = convertMessagesToGemini(messages);
   
-  // Start a chat session with history
-  const chat = model.startChat({
-    history: geminiContents.slice(0, -1), // All but the last message
-    generationConfig: {
-      temperature: 0.5,
-      maxOutputTokens: 8192,
-    },
-    systemInstruction: systemInstruction || undefined,
-  });
-  
-  // Get the last user message
-  const lastMessage = geminiContents[geminiContents.length - 1];
-  if (!lastMessage || lastMessage.role !== "user") {
-    throw new Error("Last message must be from user");
+  if (geminiContents.length === 0) {
+    throw new Error("No messages to send to Gemini API");
   }
   
-  const prompt = lastMessage.parts.map((p: any) => {
-    if ('text' in p) return p.text;
-    return "";
-  }).join("\n");
-  
   try {
-    const result = await chat.sendMessage(prompt);
+    // For simplicity, use generateContent instead of chat for single messages
+    // This avoids issues with chat history and system instructions
+    const allParts: Part[] = [];
+    
+    // Add system instruction as first text if present
+    if (systemInstruction) {
+      allParts.push({ text: `System: ${systemInstruction}\n\n` });
+    }
+    
+    // Add all messages
+    for (const content of geminiContents) {
+      if (content.role === "user") {
+        allParts.push({ text: "User: " });
+      } else if (content.role === "model") {
+        allParts.push({ text: "Assistant: " });
+      }
+      allParts.push(...content.parts);
+      allParts.push({ text: "\n\n" });
+    }
+    
+    const result = await model.generateContent({
+      contents: [{
+        role: "user",
+        parts: allParts,
+      }],
+      generationConfig: {
+        temperature: 0.5,
+        maxOutputTokens: 8192,
+      },
+    });
+    
     const response = result.response;
     const text = response.text();
     
@@ -320,7 +327,7 @@ async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
         },
       ],
       usage: {
-        prompt_tokens: 0, // Gemini doesn't provide token counts in the same way
+        prompt_tokens: 0,
         completion_tokens: 0,
         total_tokens: 0,
       },
@@ -349,43 +356,32 @@ async function invokeForgeProxy(params: InvokeParams): Promise<InvokeResult> {
     response_format,
   } = params;
 
-  // Modelo primário: Gemini 3 Pro Preview com raciocínio avançado
-  const PRIMARY_MODEL = "gemini-3-pro-preview";
-  // Modelo de fallback: Gemini 1.5 Pro Latest (caso erro de cota/disponibilidade)
+  const PRIMARY_MODEL = "gemini-3-5-sonnet";
   const FALLBACK_MODEL = "gemini-1.5-pro-latest";
 
-  const buildPayload = (modelName: string): Record<string, unknown> => {
-    const payload: Record<string, unknown> = {
-      model: modelName,
-      messages: messages.map(normalizeMessage),
+  const normalizedMessages = messages.map(normalizeMessage);
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+
+  const buildPayload = (model: string) => {
+    const payload: any = {
+      model,
+      messages: normalizedMessages,
+      temperature: 0.7,
     };
 
     if (tools && tools.length > 0) {
-      payload.tools = tools;
-    }
+      payload.tools = tools.map(tool => ({
+        type: "function",
+        function: {
+          name: tool.function.name,
+          description: tool.function.description || "",
+          parameters: tool.function.parameters || { type: "object", properties: {} },
+        },
+      }));
 
-    const normalizedToolChoice = normalizeToolChoice(
-      toolChoice || tool_choice,
-      tools
-    );
-    if (normalizedToolChoice) {
-      payload.tool_choice = normalizedToolChoice;
-    }
-
-    payload.max_tokens = 32768;
-    payload.temperature = 0.5;  // Equilíbrio entre precisão técnica e fluidez
-    
-    // Configuração de thinking para Gemini 3
-    if (modelName === PRIMARY_MODEL) {
-      payload.thinking = {
-        "type": "enabled",
-        "budget_tokens": 8192  // Budget maior para raciocínio avançado
-      };
-      payload.thinking_level = "high";  // Ativa raciocínio avançado para interpretar manuais
-    } else {
-      payload.thinking = {
-        "budget_tokens": 128
-      };
+      if (normalizedToolChoice) {
+        payload.tool_choice = normalizedToolChoice;
+      }
     }
 
     const normalizedResponseFormat = normalizeResponseFormat({
@@ -434,21 +430,39 @@ async function invokeForgeProxy(params: InvokeParams): Promise<InvokeResult> {
         },
         body: JSON.stringify(buildPayload(FALLBACK_MODEL)),
       });
-
-      if (!response.ok) {
-        const fallbackErrorText = await response.text();
-        throw new Error(
-          `LLM invoke failed (fallback): ${response.status} ${response.statusText} – ${fallbackErrorText}`
-        );
-      }
-    } else {
-      throw new Error(
-        `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-      );
     }
   }
 
-  return (await response.json()) as InvokeResult;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`[LLM] API request failed: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  // Handle error response from API
+  if (data.error) {
+    throw new Error(`[LLM] API error: ${data.error.message}`);
+  }
+
+  // Transform Forge response to standard format
+  const choices = data.choices.map((choice: any) => ({
+    index: choice.index,
+    message: {
+      role: choice.message.role,
+      content: choice.message.content,
+      tool_calls: choice.message.tool_calls,
+    },
+    finish_reason: choice.finish_reason,
+  }));
+
+  return {
+    id: data.id,
+    created: data.created,
+    model: data.model,
+    choices,
+    usage: data.usage,
+  };
 }
 
 const normalizeResponseFormat = ({
@@ -496,13 +510,31 @@ const normalizeResponseFormat = ({
   };
 };
 
+import { ENV } from "./env";
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
 
   // Use direct Gemini integration if API key is available
   if (shouldUseGeminiDirect()) {
     console.log("[LLM] Using direct Google Gemini API");
-    return invokeGeminiDirect(params);
+    try {
+      return await invokeGeminiDirect(params);
+    } catch (error: any) {
+      // If Gemini fails due to quota or availability, fallback to Forge
+      const errorMessage = error.message || "";
+      const isQuotaError = errorMessage.includes("429") || 
+                          errorMessage.includes("quota") ||
+                          errorMessage.includes("exceeded") ||
+                          errorMessage.includes("Too Many Requests");
+      
+      if (isQuotaError && ENV.forgeApiKey) {
+        console.warn("[LLM] Gemini API quota exceeded, falling back to Forge proxy");
+        return invokeForgeProxy(params);
+      }
+      
+      throw error;
+    }
   }
 
   // Fallback to Forge proxy if Gemini key not available

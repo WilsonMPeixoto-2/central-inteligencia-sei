@@ -19,7 +19,7 @@ export const appRouter = router({
     sendMessage: publicProcedure
       .input(z.object({
         message: z.string().min(1).max(5000),
-        sessionId: z.string().optional(),
+        sessionId: z.string().nullish(),
       }))
       .mutation(async ({ input, ctx }) => {
         const sessionId = input.sessionId || nanoid();
