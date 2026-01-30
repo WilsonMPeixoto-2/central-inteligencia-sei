@@ -155,3 +155,57 @@
 - [x] Implementar gatilhos obrigatórios para busca web (perguntas comparativas, termos fora da base)
 - [x] Adicionar formato de resposta com lacunas (indicar explicitamente o que não foi encontrado)
 - [x] Testar com pergunta comparativa "diferença entre SEI-Rio e Processo.Rio"
+
+## Transformação em Site Permanente (Produção)
+
+### Fase 1: Configuração de Produção
+- [x] Remover referências institucionais específicas (SME, CRE, SEI RIO)
+- [x] Implementar fallback automático Gemini → Forge API
+- [x] Corrigir validação de sessionId
+- [ ] Configurar variáveis de ambiente de produção
+- [ ] Implementar logging estruturado para monitoramento
+- [ ] Configurar rate limiting e proteção contra abuso
+- [ ] Implementar CORS e segurança de headers
+
+### Fase 2: Persistência de Dados
+- [x] Criar tabela de histórico de chats no banco de dados
+- [x] Implementar salvar/carregar histórico de conversas
+- [x] Adicionar timestamps e metadados de sessão
+- [ ] Implementar limpeza automática de sessões antigas (>30 dias)
+- [ ] Criar índices para performance de busca
+
+### Fase 3: Otimização de Performance
+- [ ] Implementar cache de respostas frequentes
+- [ ] Otimizar queries de busca vetorial (HNSW)
+- [ ] Implementar compressão de resposta (gzip)
+- [ ] Adicionar lazy loading para documentos da base
+- [ ] Otimizar bundle size do frontend
+
+### Fase 4: SEO e Metadados
+- [ ] Adicionar meta tags (title, description, og:image)
+- [ ] Implementar sitemap.xml
+- [ ] Adicionar robots.txt
+- [ ] Implementar schema.org para rich snippets
+- [ ] Configurar Google Analytics
+
+### Fase 5: Funcionalidades Adicionais
+- [ ] Implementar feedback de usuário (thumbs up/down)
+- [ ] Adicionar exportação de conversa em PDF
+- [ ] Implementar busca no histórico de chats
+- [ ] Adicionar modo escuro/claro
+- [ ] Implementar temas de cores customizáveis
+
+### Fase 6: Documentação e Deploy
+- [ ] Criar documentação técnica (README.md)
+- [ ] Documentar API endpoints
+- [ ] Criar guia de instalação e deployment
+- [ ] Configurar CI/CD pipeline
+- [ ] Criar checkpoint final
+- [ ] Publicar site em produção
+
+### Fase 7: Monitoramento Pós-Launch
+- [ ] Configurar alertas de erro
+- [ ] Implementar health checks
+- [ ] Monitorar latência de resposta
+- [ ] Coletar métricas de uso
+- [ ] Planejar melhorias baseadas em feedback
